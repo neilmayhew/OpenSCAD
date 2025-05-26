@@ -1,4 +1,5 @@
- {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 {- |
 Module      : Graphics.OpenSCAD
@@ -135,8 +136,10 @@ import Data.Colour (Colour, AlphaColour, alphaChannel, darken, over, black)
 import Data.Colour.Names as Colours
 import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
 import Data.List (elemIndices, nub, intercalate)
+import Data.List.NonEmpty (NonEmpty ((:|)), nonEmpty)
 import qualified Data.List.NonEmpty as NE
-import Data.Monoid ((<>), Monoid, mconcat, mempty, mappend)
+import Data.Semigroup (Semigroup((<>), sconcat))
+import Data.Monoid (Monoid(mconcat, mempty))
 import qualified Data.Set as Set
 import System.FilePath (FilePath)
 
@@ -618,15 +621,16 @@ def = Def
 diam :: Double -> Double
 diam = (/ 2)
 
--- Now, let Haskell work it's magic
+instance Vector v => Semigroup (Model v) where
+  Solid (Box 0 0 0) <> b = b
+  a <> Solid (Box 0 0 0) = a
+  a <> b = union [a, b]
+  sconcat (a :| []) = a
+  sconcat as = union $ NE.toList as
+
 instance Vector v => Monoid (Model v) where
   mempty = Solid $ Box 0 0 0
-  mappend (Solid (Box 0 0 0)) b = b
-  mappend a (Solid (Box 0 0 0)) = a
-  mappend a b = union [a, b]
-  mconcat [a] = a
-  mconcat as = union as
-
+  mconcat = maybe mempty sconcat . nonEmpty
 
 -- | You can use '(#)' to write transformations in a more readable postfix form,
 --   cube 3 # color red # translate (-3, -3, -3)

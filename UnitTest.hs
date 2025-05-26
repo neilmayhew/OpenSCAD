@@ -4,9 +4,9 @@ module Main where
 
 import Control.DeepSeq
 import Control.Exception
+import GHC.Stack
 import Test.Tasty
 import Test.Tasty.HUnit
-import Test.HUnit.Tools
 import Graphics.OpenSCAD
 import Data.Colour (withOpacity)
 import Data.List.NonEmpty (fromList)
@@ -14,8 +14,12 @@ import Data.Monoid ((<>), Monoid,mconcat, mempty, mappend)
 
 
 
-assertError err code =
-  assertRaises "Check error"  (ErrorCall err) . evaluate $ deepseq (show code) ()
+assertError :: (Show a, HasCallStack) => String -> a -> IO ()
+assertError err code = do
+  r <- try . evaluate $ deepseq (show code) ()
+  case r of
+    Left (ErrorCall e) -> e @?= err
+    Right _ -> assertFailure $ "Expecting (ErrorCall " <> show err <> ") but no exception was thrown"
 
 sw = concat . words
 st n e a = testCase n $ (sw $ render a) @?= (sw e)
@@ -128,7 +132,7 @@ tests = testGroup "Tests" [
        st "Normal" "surface(file=\"test.dat\",convexity=5);" $
           surface "test.dat" False 5,
        st "Inverted" "surface(file=\"test.dat\",invert=true,convexity=5);" $
-          surface "test.dat" True 5	-- Requires  2014.QX
+          surface "test.dat" True 5 -- Requires  2014.QX
        ]
      ],
      
